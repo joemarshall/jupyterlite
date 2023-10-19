@@ -1,0 +1,67 @@
+{
+  "name": "@jupyterlite/webcomponent",
+  "version": "0.2.0-alpha.3",
+  "description": "JupyterLite - Webcomponent",
+  "homepage": "https://github.com/jupyterlite/jupyterlite",
+  "bugs": {
+    "url": "https://github.com/jupyterlite/jupyterlite/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jupyterlite/jupyterlite.git"
+  },
+  "license": "BSD-3-Clause",
+  "author": "JupyterLite Contributors",
+  "sideEffects": [
+    "style/*.css",
+    "style/index.js"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "style": "style/index.css",
+  "directories": {
+    "lib": "lib/"
+  },
+  "files": [
+    "lib/*.d.ts",
+    "lib/*.js.map",
+    "lib/*.js",
+    "style/*.css",
+    "style/index.js"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rimraf lib && rimraf tsconfig.tsbuildinfo",
+    "docs": "typedoc src",
+    "prepublishOnly": "npm run build",
+    "watch": "tsc -b --watch"
+  },
+  "dependencies": {
+    "@jupyterlab/application": "~4.0.6",
+    "@jupyterlab/coreutils": "~6.0.6",
+    "@jupyterlab/docregistry": "~4.0.6",
+    "@jupyterlab/mathjax-extension": "~4.0.6",
+    "@jupyterlab/rendermime-interfaces": "~3.8.6",
+    "@lumino/coreutils": "^2.1.2",
+    "@lumino/signaling": "^2.1.2",
+    "@lumino/widgets": "^2.3.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.11.6",
+    "@babel/preset-env": "^7.12.1",
+    "@jupyterlab/testutils": "~4.0.6",
+    "@types/jest": "^29.5.3",
+    "jest": "^29.6.2",
+    "path": "^0.12.7",
+    "rimraf": "~5.0.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "~5.0.4"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "jupyterlab": {
+    "coreDependency": true
+  },
+  "styleModule": "style/index.js"
+}

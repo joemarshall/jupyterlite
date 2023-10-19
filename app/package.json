@@ -38,7 +38,8 @@
       "tree",
       "edit",
       "notebooks",
-      "consoles"
+      "consoles",
+      "webcomponent"
     ]
   }
 }
