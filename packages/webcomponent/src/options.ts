@@ -1,4 +1,3 @@
-export interface NotebookOptions {
-    initWheels?: string;
-  }
-  
+export interface INotebookOptions {
+  initWheels?: string;
+}

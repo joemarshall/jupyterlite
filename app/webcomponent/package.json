@@ -161,6 +161,7 @@
     "@jupyterlite/server-extension": "^0.2.0-alpha.3",
     "@jupyterlite/types": "^0.2.0-alpha.3",
     "@jupyterlite/ui-components": "^0.2.0-alpha.3",
+    "@jupyterlite/webcomponent": "^0.2.0-alpha.3",
     "es6-promise": "~4.2.8",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -168,7 +169,7 @@
   },
   "jupyterlab": {
     "title": "JupyterLite Webcomponent",
-    "appClassName": "JupyterLab",
+    "appClassName": "JupyterNotebookComponent",
     "appModuleName": "@jupyterlite/webcomponent",
     "extensions": [
       "@jupyterlab/application-extension",
@@ -219,6 +220,7 @@
       "@codemirror/state",
       "@codemirror/view",
       "@jupyter/ydoc",
+      "@jupyterlite/webcomponent",
       "@jupyterlab/application",
       "@jupyterlab/apputils",
       "@jupyterlab/cell-toolbar",

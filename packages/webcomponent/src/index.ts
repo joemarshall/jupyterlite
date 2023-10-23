@@ -1,13 +1,15 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import type { NotebookOptions } from './options';
+import type { INotebookOptions } from './options';
 import defaultsDeep from 'lodash/defaultsDeep';
+import 'console';
 
-declare var __webpack_public_path__: string;
+declare let __webpack_public_path__: string;
 console.log('WPP:', __webpack_public_path__);
-const pypiLink = new URL('./pypi/all.json', __webpack_public_path__).toString();
-const baseURL = new URL('../', __webpack_public_path__).toString();
+//const pypiLink = new URL('./pypi/all.json', __webpack_public_path__).toString();
+//const baseURL = new URL('../', __webpack_public_path__).toString();
+const baseURL = '/';
 
 const jupyterConfigDomId = 'jupyter-config-data';
 const elementName = 'jupyter-notebook';
@@ -24,18 +26,20 @@ const baseConfig = {
   licensesUrl: './lab/api/licenses',
   mathjaxConfig: 'TeX-AMS_CHTML-full,Safe',
   mathjaxUrl: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js',
-  litePluginSettings: {
+  /*  litePluginSettings: {
     '@jupyterlite/pyolite-kernel-extension:kernel': {
       pyodideUrl: 'https://cdn.jsdelivr.net/pyodide/v0.20.0/full/pyodide.mjs',
-      pipliteUrls: [pypiLink.toString()]
+//      pipliteUrls: [pypiLink.toString()]
     }
-  }
+  }*/
 };
 
 function overrideConfig(config: any): void {
   defaultsDeep(config, baseConfig);
 
-  let configScriptEl = document.getElementById(jupyterConfigDomId) as HTMLOrSVGScriptElement;
+  let configScriptEl = document.getElementById(
+    jupyterConfigDomId,
+  ) as HTMLOrSVGScriptElement;
   if (!configScriptEl) {
     configScriptEl = document.createElement('script') as HTMLOrSVGScriptElement;
     configScriptEl.setAttribute('id', jupyterConfigDomId);
@@ -46,19 +50,21 @@ function overrideConfig(config: any): void {
   configScriptEl.textContent = JSON.stringify(config);
 }
 
-class JupyterNotebookCommponent extends HTMLElement {
+export class JupyterNotebookComponent extends HTMLElement {
   // NOTE: currently no need to to override constructor()
 
   // constructor() should NOT access or set any element properties; use connectedCallback instead.
   // See: https://html.spec.whatwg.org/multipage/custom-elements.html#custom-element-conformance
   connectedCallback() {
     const source = this.getAttribute('src');
-    if (!source) return;
+    if (!source) {
+      return;
+    }
 
     const pyodideUrl = this.getAttribute('pyodideurl');
     const workerUrl = this.getAttribute('serviceworkerurl');
-    const options: NotebookOptions = {
-      initWheels: this.getAttribute('initwheels') ?? undefined
+    const options: INotebookOptions = {
+      initWheels: this.getAttribute('initwheels') ?? undefined,
     };
 
     this.style.height = 'fit-content';
@@ -68,14 +74,20 @@ class JupyterNotebookCommponent extends HTMLElement {
     const litePluginSettings: any = {};
 
     if (pyodideUrl) {
-      litePluginSettings['@jupyterlite/pyolite-kernel-extension:kernel'] = { pyodideUrl };
+      litePluginSettings['@jupyterlite/pyolite-kernel-extension:kernel'] = {
+        pyodideUrl,
+      };
     }
 
     if (workerUrl) {
       if (workerUrl == 'disabled') {
-        litePluginSettings['@jupyterlite/server-extension:service-worker'] = { disabled: true };
+        litePluginSettings['@jupyterlite/server-extension:service-worker'] = {
+          disabled: true,
+        };
       } else {
-        litePluginSettings['@jupyterlite/server-extension:service-worker'] = { workerUrl };
+        litePluginSettings['@jupyterlite/server-extension:service-worker'] = {
+          workerUrl,
+        };
       }
     }
 
@@ -89,8 +101,9 @@ class JupyterNotebookCommponent extends HTMLElement {
   }
 }
 
-export default function registerComponent() {
+export function registerComponent() {
   if (!customElements.get(elementName)) {
-    customElements.define(elementName, JupyterNotebookCommponent);
+    console.log('Registering');
+    customElements.define(elementName, JupyterNotebookComponent);
   }
 }

@@ -7,6 +7,7 @@ body {
   margin: 0;
   padding: 0;
   background: var(--jp-layout-color2);
+  overflow:auto;
 }
 
 #main {
@@ -19,4 +20,27 @@ body {
 
 #single-widget-panel {
   height: 100%;
+}
+
+.jp-NotebookPanel {
+  border-bottom: 1px solid #e0e0e0;
+  height: fit-content;
+  width: 100%;
+}
+
+.jp-WindowedPanel-outer{
+  height: fit-content;
+}
+
+.jp-Toolbar {
+  position: relative;
+}
+
+.jp-Notebook {
+  contain: paint style;
+  overflow: auto;
+}
+
+.notebookCommandPalette {
+  min-width: 225px;
 }

@@ -1,7 +1,7 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
-import type { NotebookOptions } from './options';
+import type { INotebookOptions } from './options';
 
 import { PageConfig } from '@jupyterlab/coreutils';
 
@@ -13,24 +13,22 @@ import { Dialog } from '@jupyterlab/apputils';
 import { nullTranslator } from '@jupyterlab/translation';
 
 const serverExtensions = [
-//  import('@jupyterlite/pyolite-kernel-extension'),
-  import('@jupyterlite/server-extension')
+  //  import('@jupyterlite/pyolite-kernel-extension'),
+  import('@jupyterlite/server-extension'),
 ];
 
-import '@jupyterlab/application/style/index.css';
-import '@jupyterlab/codemirror/style/index.css';
-import '@jupyterlab/completer/style/index.css';
-import '@jupyterlab/documentsearch/style/index.css';
-import '@jupyterlab/notebook/style/index.css';
-import '@jupyterlab/theme-light-extension/style/theme.css';
-import './base.css';
+import '../style/index.css';
 
-import {  CodeMirrorEditorFactory,CodeMirrorMimeTypeService,EditorLanguageRegistry} from '@jupyterlab/codemirror';
+import {
+  CodeMirrorEditorFactory,
+  CodeMirrorMimeTypeService,
+  EditorLanguageRegistry,
+} from '@jupyterlab/codemirror';
 
 import { CommandRegistry } from '@lumino/commands';
 
 import { Widget, Panel } from '@lumino/widgets';
-import { ISignal, Signal} from '@lumino/signaling';
+import { ISignal, Signal } from '@lumino/signaling';
 import { MathJaxTypesetter } from '@jupyterlab/mathjax-extension';
 import { ReactiveToolbar } from '@jupyterlab/ui-components';
 
@@ -38,14 +36,10 @@ import {
   NotebookModelFactory,
   NotebookPanel,
   NotebookWidgetFactory,
-  ExecutionIndicator
+  ExecutionIndicator,
 } from '@jupyterlab/notebook';
 
-import {
-  Completer,
-  CompleterModel,
-} from '@jupyterlab/completer';
-
+import { Completer, CompleterModel } from '@jupyterlab/completer';
 
 /*import {
   CodeEditor,
@@ -54,20 +48,18 @@ import {
 } from '@jupyterlab/codeeditor';
 */
 
-import { DocumentManager,IDocumentWidgetOpener } from '@jupyterlab/docmanager';
+import { DocumentManager, IDocumentWidgetOpener } from '@jupyterlab/docmanager';
 
-import { DocumentRegistry,IDocumentWidget} from '@jupyterlab/docregistry';
+import { DocumentRegistry, IDocumentWidget } from '@jupyterlab/docregistry';
 
 import {
   standardRendererFactories as initialFactories,
-  RenderMimeRegistry
+  RenderMimeRegistry,
 } from '@jupyterlab/rendermime';
 
 import { SetupCommands } from './commands';
 
-import {
-  PathExt
-} from '@jupyterlab/coreutils';
+import { PathExt } from '@jupyterlab/coreutils';
 
 /**
  * Iterate over active plugins in an extension.
@@ -82,15 +74,14 @@ function* activePlugins(extension: any) {
     exports = extension;
   }
 
-  let plugins = Array.isArray(exports) ? exports : [exports];
-  for (let plugin of plugins) {
+  const plugins = Array.isArray(exports) ? exports : [exports];
+  for (const plugin of plugins) {
     if (PageConfig.Extension.isDisabled(plugin.id)) {
       continue;
     }
     yield plugin;
   }
 }
-
 
 // autosaver class to save document if changed
 class AutoSaver {
@@ -104,7 +95,7 @@ class AutoSaver {
 
   constructor(serviceManager: any, notebook: any, path: string) {
     this.lastSave = new Date();
-    this.inSave=false;
+    this.inSave = false;
     this.serviceManager = serviceManager;
     this.path = path;
     this.notebook = notebook;
@@ -141,9 +132,9 @@ class AutoSaver {
   }
 }
 
-var _autoSaver: AutoSaver;
+let _autoSaver: AutoSaver;
 
-function removeToolbarWidgets(toolbar: Widget) {
+/*function removeToolbarWidgets(toolbar: Widget) {
   // This returns a Lumino 1.x ArrayIterator, _not_ a JavaScript iterator
   // see: https://lumino.readthedocs.io/en/1.x/api/algorithm/classes/arrayiterator.html
   const widgetIterator = toolbar.children();
@@ -165,22 +156,23 @@ function removeToolbarWidgets(toolbar: Widget) {
     widget.parent=null;
     widget.dispose();
   }
-}
+}*/
 
 export async function init(
   notebookSource: string,
   parentElement: HTMLElement,
-  options: NotebookOptions
+  options: INotebookOptions,
 ): Promise<void> {
+
   const initWheelList = options.initWheels?.split('\n') || [];
 
   // @ts-ignore
   const jupyterLiteServer = new JupyterLiteServer({});
-  let litePluginsToRegister: any = [];
+  const litePluginsToRegister: any = [];
   // Add the base serverlite extensions
   const baseServerExtensions = await Promise.all(serverExtensions);
   baseServerExtensions.forEach((p) => {
-    for (let plugin of activePlugins(p)) {
+    for (const plugin of activePlugins(p)) {
       litePluginsToRegister.push(plugin);
     }
   });
@@ -205,41 +197,46 @@ export async function init(
     (event) => {
       commands.processKeydownEvent(event);
     },
-    useCapture
+    useCapture,
   );
   const rendermime = new RenderMimeRegistry({
     initialFactories: initialFactories,
-    latexTypesetter: new MathJaxTypesetter()});
-/*    {
+    latexTypesetter: new MathJaxTypesetter(),
+  });
+  /*    {
       url: PageConfig.getOption('mathjaxUrl'),
       config: PageConfig.getOption('mathjaxConfig')
     })*/
 
-  class Opener implements IDocumentWidgetOpener{
+  class Opener implements IDocumentWidgetOpener {
+    private _opened = new Signal<
+      Opener,
+      IDocumentWidget<Widget, DocumentRegistry.IModel>
+    >(this);
 
-    private _opened = new Signal<Opener, IDocumentWidget<Widget, DocumentRegistry.IModel>>(this);
-
-    public get opened(): ISignal<Opener,IDocumentWidget<Widget, DocumentRegistry.IModel>> {
+    public get opened(): ISignal<
+      Opener,
+      IDocumentWidget<Widget, DocumentRegistry.IModel>
+    > {
       return this._opened;
-    }    
-    
-    open(widget: Widget,options?:DocumentRegistry.IOpenOptions) {
-      // Do nothing for sibling widgets for now.
     }
 
-  };
+    open(widget: Widget, options?: DocumentRegistry.IOpenOptions) {
+      // Do nothing for sibling widgets for now.
+    }
+  }
 
   const docRegistry = new DocumentRegistry();
   const docManager = new DocumentManager({
     registry: docRegistry,
     manager: serviceManager,
-    opener: new Opener()
+    opener: new Opener(),
   });
-  const languages= new EditorLanguageRegistry();
+  const languages = new EditorLanguageRegistry();
   const mimeTypeService = new CodeMirrorMimeTypeService(languages);
   const mFactory = new NotebookModelFactory({});
   const editorFactory = new CodeMirrorEditorFactory().newInlineEditor;
-  const contentFactory = new NotebookPanel.ContentFactory({editorFactory});
+  const contentFactory = new NotebookPanel.ContentFactory({ editorFactory });
 
   const wFactory = new NotebookWidgetFactory({
     name: 'Notebook',
@@ -250,7 +247,7 @@ export async function init(
     canStartKernel: true,
     rendermime,
     contentFactory,
-    mimeTypeService
+    mimeTypeService,
   });
   docRegistry.addModelFactory(mFactory);
   docRegistry.addWidgetFactory(wFactory);
@@ -267,20 +264,20 @@ export async function init(
     type: 'file',
     content: notebookText,
     mimetype: 'text/plain',
-    format: 'text'
+    format: 'text',
   };
 
   // first check two things
   // 1) Does the base file need rewriting
   // 2) Do we have an autosaved version of the file which is different from the (previous) base file
-  var updatedBaseFile: boolean = false;
-  var autosaveExists: boolean = false;
+  let updatedBaseFile: boolean = false;
+  let autosaveExists: boolean = false;
 
   try {
     const current = await serviceManager.contents.get(notebookPath, {
       content: true,
       format: 'text',
-      type: 'file'
+      type: 'file',
     });
     if (current.content != notebookText) {
       updatedBaseFile = true;
@@ -315,9 +312,9 @@ export async function init(
           'This notebook has been updated on the website, load it and overwrite any changes you may have made?',
         buttons: [
           Dialog.cancelButton({ label: 'Keep my changes' }),
-          Dialog.okButton({ label: 'Reset my changes' })
+          Dialog.okButton({ label: 'Reset my changes' }),
         ],
-        host: parentElement
+        host: parentElement,
       });
       const response = await dialog.launch();
       if (response.button.accept === true) {
@@ -336,7 +333,7 @@ export async function init(
   const model = new CompleterModel();
   const completer = new Completer({ editor, model });
   const sessionContext = nbWidget.context.sessionContext;
-/*  const reconciliator =new ProviderReconciliator();
+  /*  const reconciliator =new ProviderReconciliator();
   const handler = new CompletionHandler({ completer, reconciliator });
 
   // Set the handler's editor.
@@ -350,7 +347,7 @@ export async function init(
   // Hide the widget when it first loads.
   completer.hide();*/
 
-  removeToolbarWidgets(nbWidget.toolbar);
+  //removeToolbarWidgets(nbWidget.toolbar);
 
   // setup toolbar, keyboard shortcuts etc.
   SetupCommands(
@@ -359,15 +356,15 @@ export async function init(
     nbWidget,
     serviceManager,
     fileContents,
-    autosavePath
+    autosavePath,
   );
 
   // add execution indicator at end of the toolbar
   nbWidget.toolbar.addItem('spacer', ReactiveToolbar.createSpacerItem());
-  let indicator = ExecutionIndicator.createExecutionIndicatorItem(
+  const indicator = ExecutionIndicator.createExecutionIndicatorItem(
     nbWidget,
     nullTranslator,
-    undefined
+    undefined,
   );
   nbWidget.toolbar.addItem('Kernel status:', indicator);
   indicator.update();
@@ -388,8 +385,8 @@ export async function init(
   // NOTE: Don't try and do this in css, because jupyterlab adds
   // style elements that override it
   window.setTimeout(() => {
-    let all_divs = parentElement.getElementsByTagName('div');
-    for (let d of all_divs) {
+    const all_divs = parentElement.getElementsByTagName('div');
+    for (const d of all_divs) {
       if (
         d.id === 'notebook_main' ||
         d.classList.contains('jp-Cell') ||
@@ -401,12 +398,16 @@ export async function init(
         d.style.position = 'relative';
         d.style.height = 'fit-content';
         d.style.top = '0px';
+        if(d.style.contain==="strict")
+        {
+          d.style.contain="style paint";
+        }
       }
     }
   }, 0);
 
   // load all the init wheels into kernel
-  var loadWheelsCode;
+  let loadWheelsCode;
 
   loadWheelsCode = `
 import pyodide_js as _pjs
@@ -430,7 +431,7 @@ del _p
 
   const content: KernelMessage.IExecuteRequestMsg['content'] = {
     code: loadWheelsCode,
-    stop_on_error: true
+    stop_on_error: true,
   };
   await sessionContext.ready;
   const kernel = sessionContext.session?.kernel;
@@ -438,7 +439,7 @@ del _p
     throw new Error('Session has no kernel.');
   }
   if (kernel.status != 'idle') {
-    var slot = async () => {
+    const slot = async () => {
       console.log(kernel.status);
       if (kernel.status === 'idle') {
         console.log('Loading wheels');
@@ -455,5 +456,7 @@ del _p
 }
 
 window.addEventListener('beforeunload', () => {
-  if (_autoSaver) _autoSaver.release();
+  if (_autoSaver) {
+    _autoSaver.release();
+  }
 });

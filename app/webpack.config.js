@@ -60,10 +60,9 @@ function createShared(packageData, shared = null) {
   const extraShared = [];
   for (let pkg of extensionPackages) {
     let pkgShared = {};
-    let {
-      dependencies = {},
-      jupyterlab: { sharedPackages = {} } = {},
-    } = require(`${pkg}/package.json`);
+    let { dependencies = {}, jupyterlab: { sharedPackages = {} } = {} } = require(
+      `${pkg}/package.json`,
+    );
     for (let [dep, requiredVersion] of Object.entries(dependencies)) {
       if (!shared[dep]) {
         pkgShared[dep] = { requiredVersion };
@@ -132,6 +131,14 @@ function createShared(packageData, shared = null) {
   return shared;
 }
 
+function getTemplateOrOverride(templateName, projectDir) {
+  if (fs.existsSync(`${projectDir}/${templateName}`)) {
+    return path.resolve(`${projectDir}/${templateName}`).toString();
+  } else {
+    return path.resolve(`./${templateName}`).toString();
+  }
+}
+
 const topLevelBuild = path.resolve('build');
 
 const allAssetConfig = [];
@@ -173,7 +180,7 @@ for (const [name, data] of Object.entries(liteAppData)) {
 
   // Create the entry point and other assets in build directory.
   const template = Handlebars.compile(
-    fs.readFileSync(path.resolve('./index.template.js')).toString(),
+    fs.readFileSync(getTemplateOrOverride('./index.template.js', name)).toString(),
   );
   fs.writeFileSync(
     path.join(name, 'build', 'index.js'),
@@ -189,16 +196,25 @@ for (const [name, data] of Object.entries(liteAppData)) {
   // Create the bootstrap file that loads federated extensions and calls the
   // initialization logic in index.js
   const entryPoint = `./${name}/build/bootstrap.js`;
-  fs.copySync('bootstrap.js', entryPoint);
+  fs.copySync(getTemplateOrOverride('bootstrap.js', name), entryPoint);
   // Copy the publicpath file
   const publicPath = `./${name}/build/publicpath.js`;
-  fs.copySync('publicpath.js', publicPath);
+  fs.copySync(getTemplateOrOverride('publicpath.js', name), publicPath);
   allEntryPoints[`${name}/bundle`] = entryPoint;
   allEntryPoints[`${name}/publicpath`] = publicPath;
 
+  // if there are any custom js files in this app, copy them to build
+  // /*and make an entry point for them  */
+  const custom_entry_points = glob.sync(`./${name}/*.js`);
+  for (x of custom_entry_points) {
+    let basename = path.basename(x, '.js');
+    fs.copySync(x, `${name}/build/${basename}.js`);
+    //    allEntryPoints[`${name}/${basename}`] = entryPoint;
+  }
+
   // Inject the name of the app in the template to be able to filter bundle files
   const indexTemplate = Handlebars.compile(
-    fs.readFileSync(path.resolve('./index.template.html')).toString(),
+    fs.readFileSync(getTemplateOrOverride('./index.template.html', name)).toString(),
   );
   fs.writeFileSync(
     path.join(name, 'build', 'index.template.html'),
