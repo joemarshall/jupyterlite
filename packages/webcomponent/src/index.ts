@@ -1,10 +1,13 @@
 // Copyright (c) Jupyter Development Team.
 // Distributed under the terms of the Modified BSD License.
 
+
 import type { INotebookOptions } from './options';
 import defaultsDeep from 'lodash/defaultsDeep';
 import 'console';
-
+//import { IPlugin } from '@lumino/application';
+import { IRenderMime } from '@jupyterlab/rendermime-interfaces';
+import {ServiceManager} from '@jupyterlab/services'
 declare let __webpack_public_path__: string;
 console.log('WPP:', __webpack_public_path__);
 //const pypiLink = new URL('./pypi/all.json', __webpack_public_path__).toString();
@@ -33,6 +36,9 @@ const baseConfig = {
     }
   }*/
 };
+
+var mimeExtensions:IRenderMime.IExtensionModule[];
+var serviceManager:ServiceManager;
 
 function overrideConfig(config: any): void {
   defaultsDeep(config, baseConfig);
@@ -65,7 +71,9 @@ export class JupyterNotebookComponent extends HTMLElement {
     const workerUrl = this.getAttribute('serviceworkerurl');
     const options: INotebookOptions = {
       initWheels: this.getAttribute('initwheels') ?? undefined,
-    };
+      mimeExtensions,
+      serviceManager
+      };
 
     this.style.height = 'fit-content';
     this.style.width = '100%';
@@ -95,15 +103,66 @@ export class JupyterNotebookComponent extends HTMLElement {
     // during import of modules
     overrideConfig({ litePluginSettings });
 
+    options.plugins=plugins;
     import('./component').then((mod) => {
       source && mod.init(source, this, options);
     });
   }
 }
 
-export function registerComponent() {
-  if (!customElements.get(elementName)) {
-    console.log('Registering');
-    customElements.define(elementName, JupyterNotebookComponent);
-  }
+
+function registerComponent() {
+    if (!customElements.get(elementName)) {
+        console.log('Registering');
+        customElements.define(elementName, JupyterNotebookComponent);
+    }
 }
+
+
+
+var plugins:any[]=[];
+
+export class RegisterComponentFrontend
+{
+    restored:Promise<void>;
+
+    constructor(options:any){
+        this.restored=Promise.resolve();
+        if(options.mimeExtensions)
+        {
+            mimeExtensions=options.mimeExtensions;
+        }
+        if(options.serviceManager){
+            serviceManager=options.serviceManager;
+        }
+        registerComponent();
+    }
+
+    async start(){
+        return;
+    }
+
+
+  /**
+   * Register plugins from a plugin module.
+   *
+   * @param mod - The plugin module to register.
+   */
+  registerPluginModule(mod: any): void {
+    plugins.push(mod);
+  }
+
+
+    /**
+   * Register the plugins from multiple plugin modules.
+   *
+   * @param mods - The plugin modules to register.
+   */
+  registerPluginModules(mods: any[]): void {
+    mods.forEach(mod => {
+      this.registerPluginModule(mod);
+    });
+  }
+
+}
+

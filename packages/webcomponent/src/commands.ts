@@ -4,7 +4,7 @@
 import { CommandRegistry } from '@lumino/commands';
 import { SessionContextDialogs } from '@jupyterlab/apputils';
 //import { CompletionHandler } from '@jupyterlab/completer';
-import { NotebookActions, NotebookPanel } from '@jupyterlab/notebook';
+import { ToolbarItems,NotebookActions, NotebookPanel } from '@jupyterlab/notebook';
 import { ServiceManager } from '@jupyterlab/services';
 //import { NotebookSearchProvider } from '@jupyterlab/notebook';
 
@@ -272,6 +272,8 @@ export const SetupCommands = (
       label: 'Reset to original code.',
     }),
   );
+
+  toolbar.addItem("Change Cell Type",ToolbarItems.createCellTypeItem(nbWidget));
 
   const bindings = [
     {

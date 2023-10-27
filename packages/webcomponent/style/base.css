@@ -11,15 +11,13 @@ body {
 }
 
 #main {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
+  height:fit-content;
+  width:100%;
 }
 
 #single-widget-panel {
-  height: 100%;
+  height: fit-content;
 }
 
 .jp-NotebookPanel {
@@ -30,15 +28,14 @@ body {
 
 .jp-WindowedPanel-outer{
   height: fit-content;
+  overflow-y: hide !important;
 }
 
-.jp-Toolbar {
-  position: relative;
-}
 
 .jp-Notebook {
-  contain: paint style;
-  overflow: auto;
+  contain: paint style!important;;
+  height: fit-content!important;
+  overflow-y: hide!important;
 }
 
 .notebookCommandPalette {

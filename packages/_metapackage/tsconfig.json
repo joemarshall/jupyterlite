@@ -22,6 +22,7 @@
     { "path": "../translation" },
     { "path": "../types" },
     { "path": "../ui-components" },
-    { "path": "../webcomponent" }
+    { "path": "../webcomponent" },
+    { "path": "../webcomponent-extension" }
   ]
 }

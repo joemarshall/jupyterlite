@@ -3,85 +3,59 @@
 
 import type { INotebookOptions } from './options';
 
-import { PageConfig } from '@jupyterlab/coreutils';
-
-import { JupyterLiteServer } from '@jupyterlite/server';
+import {ServiceManager} from '@jupyterlab/services'
+import { IYText } from '@jupyter/ydoc';
 import { Contents, KernelMessage } from '@jupyterlab/services';
-
 import { Dialog } from '@jupyterlab/apputils';
 
 import { nullTranslator } from '@jupyterlab/translation';
+import { SingleWidgetApp,SingleWidgetShell } from '@jupyterlite/application';
 
-const serverExtensions = [
-  //  import('@jupyterlite/pyolite-kernel-extension'),
-  import('@jupyterlite/server-extension'),
-];
+import { INotebookTracker,NotebookTracker,NotebookWidgetFactory, NotebookModelFactory} from '@jupyterlab/notebook';
+import {  standardRendererFactories, RenderMimeRegistry} from '@jupyterlab/rendermime';
+import { createMarkdownParser } from '@jupyterlab/markedparser-extension';
+import { MathJaxTypesetter } from '@jupyterlab/mathjax-extension';
 
-import '../style/index.css';
+import { CommandRegistry } from '@lumino/commands';
+
+import { Widget } from '@lumino/widgets';
+import { ISignal, Signal } from '@lumino/signaling';
+import { ReactiveToolbar } from '@jupyterlab/ui-components';
+
+import {
+  NotebookPanel,
+  ExecutionIndicator,
+} from '@jupyterlab/notebook';
+
+import { CompletionHandler,KernelCompleterProvider,ProviderReconciliator,Completer, CompleterModel } from '@jupyterlab/completer';
 
 import {
   CodeMirrorEditorFactory,
   CodeMirrorMimeTypeService,
+  EditorExtensionRegistry,
   EditorLanguageRegistry,
+  EditorThemeRegistry,
+  ybinding
 } from '@jupyterlab/codemirror';
 
-import { CommandRegistry } from '@lumino/commands';
-
-import { Widget, Panel } from '@lumino/widgets';
-import { ISignal, Signal } from '@lumino/signaling';
-import { MathJaxTypesetter } from '@jupyterlab/mathjax-extension';
-import { ReactiveToolbar } from '@jupyterlab/ui-components';
-
 import {
-  NotebookModelFactory,
-  NotebookPanel,
-  NotebookWidgetFactory,
-  ExecutionIndicator,
-} from '@jupyterlab/notebook';
-
-import { Completer, CompleterModel } from '@jupyterlab/completer';
-
-/*import {
-  CodeEditor,
-  IEditorServices,
-  IPositionModel
-} from '@jupyterlab/codeeditor';
-*/
+  
+} from '@jupyterlab/codeeditor'
 
 import { DocumentManager, IDocumentWidgetOpener } from '@jupyterlab/docmanager';
 
 import { DocumentRegistry, IDocumentWidget } from '@jupyterlab/docregistry';
 
-import {
-  standardRendererFactories as initialFactories,
-  RenderMimeRegistry,
-} from '@jupyterlab/rendermime';
-
 import { SetupCommands } from './commands';
 
 import { PathExt } from '@jupyterlab/coreutils';
 
-/**
- * Iterate over active plugins in an extension.
- */
-function* activePlugins(extension: any) {
-  // Handle commonjs or es2015 modules
-  let exports;
-  if (extension.hasOwnProperty('__esModule')) {
-    exports = extension.default;
-  } else {
-    // CommonJS exports.
-    exports = extension;
-  }
-
-  const plugins = Array.isArray(exports) ? exports : [exports];
-  for (const plugin of plugins) {
-    if (PageConfig.Extension.isDisabled(plugin.id)) {
-      continue;
-    }
-    yield plugin;
-  }
-}
+import '@jupyterlab/application/style/index.css';
+import '@jupyterlab/codemirror/style/index.css';
+import '@jupyterlab/completer/style/index.css';
+import '@jupyterlab/documentsearch/style/index.css';
+import '@jupyterlab/notebook/style/index.css';
+import '../style/index.css';
 
 // autosaver class to save document if changed
 class AutoSaver {
@@ -134,55 +108,58 @@ class AutoSaver {
 
 let _autoSaver: AutoSaver;
 
-/*function removeToolbarWidgets(toolbar: Widget) {
-  // This returns a Lumino 1.x ArrayIterator, _not_ a JavaScript iterator
-  // see: https://lumino.readthedocs.io/en/1.x/api/algorithm/classes/arrayiterator.html
-  const widgetIterator = toolbar.children();
+function makeEditor()
+{
+  const editorExtensions = () => {
+    const themes = new EditorThemeRegistry();
+    EditorThemeRegistry.getDefaultThemes().forEach(theme => {
+      themes.addTheme(theme);
+    });
+    const registry = new EditorExtensionRegistry();
 
-  const widgets = [];
-  let widget;
+    EditorExtensionRegistry.getDefaultExtensions({ themes }).forEach(
+      extensionFactory => {
+        registry.addExtension(extensionFactory);
+      }
+    );
+    registry.addExtension({
+      name: 'shared-model-binding',
+      factory: options => {
+        const sharedModel = options.model.sharedModel as IYText;
+        return EditorExtensionRegistry.createImmutableExtension(
+          ybinding({
+            ytext: sharedModel.ysource,
+            undoManager: sharedModel.undoManager ?? undefined
+          })
+        );
+      }
+    });
+    return registry;
+  };
 
-  // collect all the widgets into an array for future disposal
-  // NOTE: this fails if you dispose of them w/in the while loop
-  while ((widget = widgetIterator.next())) {
-    // skip ToolbarPopupOpener (we need to keep that one)
-    if (widget.value.constructor.name !== 'ToolbarPopupOpener') {
-      widgets.push(widget.value);
-    }
-  }
+  const languages = new EditorLanguageRegistry();
+  const mimeTypeService = new CodeMirrorMimeTypeService(languages);
+  const editorFactoryService=new CodeMirrorEditorFactory({languages,extensions:editorExtensions()})
+  const editorFactory = editorFactoryService.newInlineEditor;
+  const rendermime = new RenderMimeRegistry({
+    initialFactories:standardRendererFactories,
+    latexTypesetter: new MathJaxTypesetter(),
+    markdownParser: createMarkdownParser(languages)});
 
-  // dispose of the widgets
-  for (widget of widgets) {
-    widget.parent=null;
-    widget.dispose();
-  }
-}*/
+  return {editorFactory,mimeTypeService,rendermime};
+}
 
 export async function init(
   notebookSource: string,
   parentElement: HTMLElement,
-  options: INotebookOptions,
+  options: INotebookOptions,  
 ): Promise<void> {
 
   const initWheelList = options.initWheels?.split('\n') || [];
 
-  // @ts-ignore
-  const jupyterLiteServer = new JupyterLiteServer({});
-  const litePluginsToRegister: any = [];
-  // Add the base serverlite extensions
-  const baseServerExtensions = await Promise.all(serverExtensions);
-  baseServerExtensions.forEach((p) => {
-    for (const plugin of activePlugins(p)) {
-      litePluginsToRegister.push(plugin);
-    }
-  });
-
-  jupyterLiteServer.registerPluginModules(litePluginsToRegister);
-  // start the server
-  await jupyterLiteServer.start();
-
   // retrieve the custom service manager from the server app
-  const { serviceManager } = jupyterLiteServer;
+  const serviceManager:ServiceManager=options.serviceManager;
+  await serviceManager.ready;
   await serviceManager.kernelspecs.ready;
   await serviceManager.kernelspecs.refreshSpecs();
   console.log('kernels ready', serviceManager.kernelspecs.specs);
@@ -190,6 +167,22 @@ export async function init(
   // Initialize the command registry with the bindings.
   const commands = new CommandRegistry();
   const useCapture = true;
+
+
+  // create a frontend object to hold mime plugins etc.
+  let frontend=new SingleWidgetApp({shell: new SingleWidgetShell(),mimeExtensions:options.mimeExtensions,serviceManager});
+  if(options.plugins){
+    frontend.registerPluginModules(options.plugins);
+  }
+  while(!parentElement.id){
+    // generate a hopefully unique id (and assign it if it doesn't exist)
+    var newID=`jl_webcomponent_${Math.random()}`;
+    if(!document.getElementById('newID')){
+      parentElement.id=newID;
+    }
+  }
+  await frontend.start({hostID:parentElement.id});
+  const docRegistry = frontend.docRegistry;
 
   // Setup the keydown listener for the document.
   document.addEventListener(
@@ -199,15 +192,7 @@ export async function init(
     },
     useCapture,
   );
-  const rendermime = new RenderMimeRegistry({
-    initialFactories: initialFactories,
-    latexTypesetter: new MathJaxTypesetter(),
-  });
-  /*    {
-      url: PageConfig.getOption('mathjaxUrl'),
-      config: PageConfig.getOption('mathjaxConfig')
-    })*/
-
+  
   class Opener implements IDocumentWidgetOpener {
     private _opened = new Signal<
       Opener,
@@ -226,19 +211,15 @@ export async function init(
     }
   }
 
-  const docRegistry = new DocumentRegistry();
   const docManager = new DocumentManager({
     registry: docRegistry,
     manager: serviceManager,
     opener: new Opener(),
   });
-  const languages = new EditorLanguageRegistry();
-  const mimeTypeService = new CodeMirrorMimeTypeService(languages);
-  const mFactory = new NotebookModelFactory({});
-  const editorFactory = new CodeMirrorEditorFactory().newInlineEditor;
-  const contentFactory = new NotebookPanel.ContentFactory({ editorFactory });
-
-  const wFactory = new NotebookWidgetFactory({
+  const {editorFactory,mimeTypeService,rendermime}=makeEditor();
+  const nbModelFactory = new NotebookModelFactory({});
+  const nbContentFactory = new NotebookPanel.ContentFactory({ editorFactory });  
+  const nbWidgetFactory = new NotebookWidgetFactory({
     name: 'Notebook',
     modelName: 'notebook',
     fileTypes: ['notebook'],
@@ -246,11 +227,13 @@ export async function init(
     preferKernel: true,
     canStartKernel: true,
     rendermime,
-    contentFactory,
-    mimeTypeService,
+    contentFactory:nbContentFactory,
+    mimeTypeService
+//    toolbarFactory
   });
-  docRegistry.addModelFactory(mFactory);
-  docRegistry.addWidgetFactory(wFactory);
+  nbWidgetFactory.notebookConfig.windowingMode="none";
+  docRegistry.addModelFactory(nbModelFactory);
+  docRegistry.addWidgetFactory(nbWidgetFactory);
 
   const notebookURL: URL = new URL(notebookSource, document.location.href);
   const notebookResponse = await fetch(notebookURL.toString());
@@ -327,27 +310,18 @@ export async function init(
   }
 
   const nbWidget = docManager.open(autosavePath) as NotebookPanel;
+  nbWidget.content.notebookConfig.windowingMode='none';
+  frontend.shell.add(nbWidget);
+  var nbTracker= await frontend.resolveOptionalService(INotebookTracker);
+  if(nbTracker && nbTracker instanceof NotebookTracker){
+    var tracker=nbTracker as NotebookTracker;
+    tracker.add(nbWidget);
+  }
 
   _autoSaver = new AutoSaver(serviceManager, nbWidget, 'autosaved.' + notebookPath);
-  const editor = nbWidget.content.activeCell && nbWidget.content.activeCell.editor;
-  const model = new CompleterModel();
-  const completer = new Completer({ editor, model });
   const sessionContext = nbWidget.context.sessionContext;
-  /*  const reconciliator =new ProviderReconciliator();
-  const handler = new CompletionHandler({ completer, reconciliator });
 
-  // Set the handler's editor.
-  handler.editor = editor;
 
-  // Listen for active cell changes.
-  nbWidget.content.activeCellChanged.connect((sender, cell) => {
-    handler.editor = cell && cell.editor;
-  });
-
-  // Hide the widget when it first loads.
-  completer.hide();*/
-
-  //removeToolbarWidgets(nbWidget.toolbar);
 
   // setup toolbar, keyboard shortcuts etc.
   SetupCommands(
@@ -369,29 +343,66 @@ export async function init(
   nbWidget.toolbar.addItem('Kernel status:', indicator);
   indicator.update();
 
-  const panel = new Panel();
-  panel.id = 'notebook_main';
-  panel.addWidget(nbWidget);
-  // Attach the panel to the DOM.
-  Widget.attach(panel, parentElement);
-  Widget.attach(completer, parentElement);
+  const editor =
+  nbWidget.content.activeCell && nbWidget.content.activeCell.editor;
 
-  // Handle resize events.
-  window.addEventListener('resize', () => {
-    panel.update();
+  const model = new CompleterModel();
+  const completer = new Completer({ editor, model });
+  const timeout = 1000;
+  const provider = new KernelCompleterProvider();
+  const reconciliator = new ProviderReconciliator({
+    context: { widget: nbWidget, editor, session: sessionContext.session },
+    providers: [provider],
+    timeout: timeout
+  });
+  const handler = new CompletionHandler({ completer, reconciliator });
+
+  void sessionContext.ready.then(() => {
+    const provider = new KernelCompleterProvider();
+    const reconciliator = new ProviderReconciliator({
+      context: { widget: nbWidget, editor, session: sessionContext.session },
+      providers: [provider],
+      timeout: timeout
+    });
+
+    handler.reconciliator = reconciliator;
+  });  
+
+  handler.editor=editor;
+
+  nbWidget.content.activeCellChanged.connect((sender, cell) => {
+    handler.editor = cell && cell.editor;
   });
 
-  // fix up the divs so that this scrolls nicely in the page
-  // NOTE: Don't try and do this in css, because jupyterlab adds
-  // style elements that override it
+  // Handle resize events.
+/*  window.addEventListener('resize', () => {
+    panel.update();
+  });*/
+
+  // remove css rules that apply to body element
+  // because we don't want to mess up anything outside our widget
   window.setTimeout(() => {
+    for(let sheet of document.styleSheets){
+      var rulesToDelete=[]
+      for(let i=0;i<sheet.cssRules.length;i++){
+        const rule=sheet.cssRules[i];
+        if(rule instanceof CSSStyleRule && rule.selectorText){
+          if(rule.selectorText === "body"){
+            rulesToDelete.push(i);
+          }
+        }
+      }
+      for(const r of rulesToDelete){
+        sheet.deleteRule(r);
+      }
+    }
     const all_divs = parentElement.getElementsByTagName('div');
     for (const d of all_divs) {
       if (
-        d.id === 'notebook_main' ||
-        d.classList.contains('jp-Cell') ||
+//        d.id === 'notebook_main' ||
+//        d.classList.contains('jp-Cell') ||
         d.classList.contains('jp-Notebook') ||
-        d.classList.contains('jp-NotebookPanel') ||
+//        d.classList.contains('jp-NotebookPanel') ||
         d.classList.contains('jp-Toolbar') ||
         d.classList.contains('lm-Panel')
       ) {
